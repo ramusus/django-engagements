@@ -7,8 +7,7 @@ Django tool for collection engagements (like comments or shares) for social netw
 Quick start
 -----------
 
-First of all, read installation instructions from this link
-https://github.com/ramusus/django-twitter-api
+First of all, read installation instructions from this link: https://github.com/ramusus/django-twitter-api.
 Then add this app to your INSTALLED_APPS setting::
 
     INSTALLED_APPS = (
