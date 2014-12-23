@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import re
+
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
-from forms import EngagementsForm
-import re
-from twitter_api.utils import api
-from tweepy import TweepError
+from twitter_api.api import api_call, TwitterError
+
+from .forms import EngagementsForm
 
 
 class IndexView(View, TemplateResponseMixin):
@@ -36,7 +37,7 @@ class IndexView(View, TemplateResponseMixin):
                 u'Подписчики пользователя',
                 u'Избранное',
                 u'Ретвиты',
-                #u'Комментарии',
+                # u'Комментарии',
             ],
             "rows": []
         }
@@ -46,8 +47,8 @@ class IndexView(View, TemplateResponseMixin):
             if matches:
                 status_id = matches.group(2)
                 try:
-                    response = api('get_status', status_id)
-                except TweepError:
+                    response = api_call('get_status', status_id)
+                except TwitterError:
                     result['rows'].append({
                         'status': 'error',
                         'data': [
