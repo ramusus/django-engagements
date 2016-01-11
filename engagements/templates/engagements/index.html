@@ -29,21 +29,21 @@
         </div>
     </div>
 </form>
-{% if data %}
+{% if rows %}
     <a class="select-table" href="#">Выделить таблицу</a>
     <table class="table table-hover table-striped">
         <thead>
             <tr>
-                {% for heading in data.headings %}
+                {% for heading in headers %}
                     <th>{{ heading }}</th>
                 {% endfor %}
             </tr>
         </thead>
         <tbody>
-            {% for row in data.rows %}
+            {% for row in rows %}
                 {% if row.status == 'error' %}
                     <tr class="danger">
-                        <td colspan="{{ data.headings|length }}">{{ row.data.0|safe }}</td>
+                        <td colspan="{{ headers|length }}">{{ row.data.0|safe }}</td>
                     </tr>
                 {% else %}
                     <tr>
