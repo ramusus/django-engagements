@@ -11,7 +11,7 @@
                 {% for value, name in field.field.choices %}
                     <div class="radio">
                         <label>
-                            <input type="radio" name="{{ field.html_name }}" value="{{ value }}" checked>{{ name }}
+                            <input type="radio" name="{{ field.html_name }}" value="{{ value }}" {% if field.value == value %}checked{% endif %}>{{ name }}
                         </label>
                     </div>
                     <span class="help-inline">{{ field.errors.as_text }}</span>
