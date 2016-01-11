@@ -13,7 +13,6 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'django',
         'django-annoying',
         'django-picklefield',
         'django-oauth-tokens>=0.2.2',
