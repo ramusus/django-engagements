@@ -4,7 +4,9 @@ import re
 
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
+
 from twitter_api.api import api_call, TwitterError
+from vkontakte_api.api import api_call
 
 from .forms import EngagementsForm
 
@@ -20,6 +22,14 @@ class IndexView(View, TemplateResponseMixin):
                 u'Ретвиты',
                 # u'Комментарии',
             ]
+
+    vk_headers = [
+            u'Ссылка',
+            u'Подписчики пользователя/группы',
+            u'Лайки',
+            u'Репосты',
+            u'Комментарии',
+        ]
 
     def get(self, request):
         return self.render_to_response({"form": EngagementsForm})
@@ -77,6 +87,61 @@ class IndexView(View, TemplateResponseMixin):
                     'status': 'error',
                     'data': [
                         link,
+                        'Incorrect url',
+                    ]
+                })
+
+        return rows
+
+    @staticmethod
+    def get_vk(links):
+        rows = []
+
+        for link in links:
+            matches = re.match(r'^https?://vk\.com/wall(-?\d+_\d+)$', link)
+            link = '<a href="{0}">{0}</a>'.format(link)
+            if matches:
+                post_id = matches.group(1)
+                posts = api_call('wall.getById', **{'posts': post_id, 'v': 5.27})
+                if len(posts) == 0: # ERROR
+                    rows.append({
+                        'status': 'error',
+                        'data': [
+                            link,
+                            'Record not found',
+                        ]
+                    })
+                    continue
+
+                post = posts[0]
+
+                if post['owner_id'] > 0:
+                    users = api_call('users.get', **{'user_ids': post['owner_id'], 'fields': 'followers_count', 'v': 5.27})
+                    owner = users[0]
+                    subscribers_count = owner['followers_count']
+                else:
+                    group_id = -1 * post['owner_id']
+                    groups = api_call('groups.getById', **{'group_ids': group_id, 'fields': 'members_count', 'v': 5.44})
+                    owner = groups[0]
+                    subscribers_count = owner['members_count']
+
+                rows.append({
+                    'status': 'ok',
+                    'data': [
+                        link,
+                        subscribers_count,
+                        post['likes']['count'],
+                        post['reposts']['count'],
+                        post['comments']['count'],
+                    ]
+                })
+
+            else:
+                rows.append({
+                    'status': 'error',
+                    'data': [
+                        link,
+                        'Incorrect url',
                     ]
                 })
 
