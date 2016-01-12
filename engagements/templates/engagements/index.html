@@ -43,7 +43,8 @@
             {% for row in rows %}
                 {% if row.status == 'error' %}
                     <tr class="danger">
-                        <td colspan="{{ headers|length }}">{{ row.data.0|safe }}</td>
+                        <td>{{ row.data.0|safe }}</td>
+                        <td colspan="{{ headers|length }}">{{ row.data.1 }}</td>
                     </tr>
                 {% else %}
                     <tr>
