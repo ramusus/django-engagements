@@ -6,7 +6,7 @@ from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
 
 from twitter_api.api import api_call, TwitterError
-from vkontakte_api.api import api_call
+from vkontakte_api.api import api_call as vk_api_call
 
 from .forms import EngagementsForm
 
@@ -102,7 +102,7 @@ class IndexView(View, TemplateResponseMixin):
             link = '<a href="{0}">{0}</a>'.format(link)
             if matches:
                 post_id = matches.group(1)
-                posts = api_call('wall.getById', **{'posts': post_id, 'v': 5.27})
+                posts = vk_api_call('wall.getById', **{'posts': post_id, 'v': 5.27})
                 if len(posts) == 0: # ERROR
                     rows.append({
                         'status': 'error',
@@ -116,12 +116,12 @@ class IndexView(View, TemplateResponseMixin):
                 post = posts[0]
 
                 if post['owner_id'] > 0:
-                    users = api_call('users.get', **{'user_ids': post['owner_id'], 'fields': 'followers_count', 'v': 5.27})
+                    users = vk_api_call('users.get', **{'user_ids': post['owner_id'], 'fields': 'followers_count', 'v': 5.27})
                     owner = users[0]
                     subscribers_count = owner['followers_count']
                 else:
                     group_id = -1 * post['owner_id']
-                    groups = api_call('groups.getById', **{'group_ids': group_id, 'fields': 'members_count', 'v': 5.44})
+                    groups = vk_api_call('groups.getById', **{'group_ids': group_id, 'fields': 'members_count', 'v': 5.44})
                     owner = groups[0]
                     subscribers_count = owner['members_count']
 
