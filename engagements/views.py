@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import re
+from datetime import date
+from collections import OrderedDict
 
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
@@ -8,7 +10,7 @@ from django.views.generic.base import TemplateResponseMixin
 from twitter_api.api import api_call, TwitterError
 from vkontakte_api.api import api_call as vk_api_call
 
-from .forms import EngagementsForm
+from .forms import EngagementsForm, DetailForm
 
 
 class IndexView(View, TemplateResponseMixin):
@@ -146,3 +148,186 @@ class IndexView(View, TemplateResponseMixin):
                 })
 
         return rows
+
+
+class DetailView(View, TemplateResponseMixin):
+    template_name = 'engagements/detail.html'
+
+    vk_detail_headers = OrderedDict([
+        ('name', 'Имя'),
+        ('url', 'Ссылка'),
+        ('gender', 'Пол'),
+        ('birth_date', 'Дата рождения'),
+        ('age', 'Возраст'),
+        ('country', 'Страна'),
+        ('city', 'Город'),
+        ('deactivated', 'deactivated'),
+        ('member', 'Участник'), # or Follower
+        ('like', 'Лайк'),
+        ('share', 'Поделился'),
+        ('comment', 'Комментарий'),
+    ])
+
+
+    def get(self, request):
+        return self.render_to_response({"form": DetailForm})
+
+    def post(self, request):
+        form = DetailForm(request.POST)
+        if form.is_valid():
+            link = form.cleaned_data['link']
+            print link
+
+            context = self.get_data(link)
+            context['form'] = form
+            return self.render_to_response(context)
+
+        return self.render_to_response({"form": form})
+
+    def get_social(self, link):
+        SOCIALS = {'twitter': 'https://twitter.com',
+                   'vk': 'https://vk.com',
+        }
+        for social_name, social_url in SOCIALS.items():
+            if link.startswith(social_url):
+                return social_name
+
+    def get_data(self, link):
+        social_name = self.get_social(link)
+        print social_name
+
+        return {
+            'headers': getattr(self, '%s_detail_headers' % social_name),
+            'rows': getattr(self, 'get_%s_detail' % social_name)(link)
+         }
+
+
+    def age(self, birth_date):
+        if birth_date:
+            today = date.today()
+            age = today.year - birth_date.year
+            # if today < my_birthday:
+            if today < birth_date:
+                age = age - 1
+            return age
+        else:
+            return None
+
+    # @staticmethod
+    def vk_user(self, user):
+        # print user
+
+        u = OrderedDict()
+        for k in self.vk_detail_headers.keys():
+            u[k] = ''
+
+        u['name'] = user['last_name'] + ' ' + user['first_name']
+        u['url'] = 'https://vk.com/id%s' % user['id']
+
+        if 'deactivated' in user:
+            u['deactivated'] = user['deactivated']
+
+        if 'city' in user:
+            u['city'] = user['city']['title']
+        if 'country' in user:
+            u['country'] = user['country']['title']
+
+        if user["sex"] == 2:
+            u["gender"] = "male"
+        elif user["sex"] == 1:
+            u["gender"] = "female"
+
+        if 'bdate' in user:
+            l = user["bdate"].split('.')
+            if len(l) == 3:
+                year = int(l[2])
+                month = int(l[1])
+                day = int(l[0])
+                # u["birth_date"] = user["bdate"]
+                birth_date = date(year, month, day)
+                u["birth_date"] = birth_date.strftime("%d-%m-%Y")
+                u["age"] = self.age(birth_date)
+
+        # print u
+        return u
+
+
+
+    # @staticmethod
+    def get_vk_detail(self, link):
+        from vkontakte_api.api import api_call
+
+        # like https://vk.com/dev/likes.getList
+        # share https://vk.com/dev/wall.getReposts
+        # comment https://vk.com/dev/wall.getComments
+        # members(followers) https://vk.com/dev/users.getFollowers
+
+        rows = OrderedDict()
+
+        matches = re.match(r'^https?://vk\.com/wall(-?\d+_\d+)$', link)
+        # link = '<a href="{0}">{0}</a>'.format(link)
+        if matches:
+            post_id = matches.group(1)
+            owner_id = post_id.split('_')[0]
+            item_id = post_id.split('_')[1]
+            # print owner_id
+
+            # getting followers
+            if owner_id > 0:
+                response = api_call('users.getFollowers', user_id=owner_id, v=5.44, fields='first_name, last_name, sex, bdate, country, city') # , count=1
+                followers = response['items']
+                # print followers
+            else:
+                pass
+    
+            for user in followers:
+                u = self.vk_user(user)
+                u['member'] = 1
+                rows[user['id']] = u
+
+            # getting likes
+            response = api_call('likes.getList', type='post', owner_id=owner_id, item_id=item_id, v=5.44)
+            likes = response['items']
+
+            user_likes_to_get = []
+            for user_id in likes:
+                if user_id in rows:
+                    rows[user_id]['like'] = 1
+                else:
+                    user_likes_to_get.append(user_id)
+
+            # getting shares
+            response = api_call('wall.getReposts', owner_id=owner_id, post_id=item_id, v=5.44)
+            shares = response['items']
+
+            user_shares_to_get = []
+            for share in shares:
+                user_id = share['from_id']
+                if user_id in rows:
+                    rows[user_id]['share'] = 1
+                else:
+                    user_shares_to_get.append(user_id)
+
+            # getting comments
+            response = api_call('wall.getComments', owner_id=owner_id, post_id=item_id, v=5.44)
+            comments = response['items']
+
+            user_comments_to_get = []
+            for comment in comments:
+                user_id = comment['from_id']
+                if user_id in rows:
+                    rows[user_id]['comment'] = 1
+                else:
+                    user_comments_to_get.append(user_id)
+
+            print user_likes_to_get
+            print user_shares_to_get
+            print user_comments_to_get
+
+
+
+    
+            return rows
+    
+    
+    
