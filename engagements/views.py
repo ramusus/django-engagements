@@ -270,24 +270,27 @@ class DetailView(View, TemplateResponseMixin):
             post_id = matches.group(1)
             owner_id = post_id.split('_')[0]
             item_id = post_id.split('_')[1]
-            # print owner_id
+            print post_id
+            print owner_id
 
             # getting followers
-            if owner_id > 0:
+            if int(owner_id) > 0:
                 response = api_call('users.getFollowers', user_id=owner_id, fields='last_name', v=5.44) # fields='last_name' added here to get 'deactivated' field
-                subscribers = {}
-                subscribers_user_ids = []
-
-                for u in response['items']:
-                    user_id = u['id']
-                    subscribers[user_id] = u
-                    subscribers_user_ids.append(user_id)
-
-                print "______________________"
-                print response['count']
-
             else:
-                pass
+                group_id = -1 * int(owner_id)
+                response = api_call('groups.getMembers', group_id=group_id, fields='last_name', v=5.44) # fields='last_name' added here to get 'deactivated' field
+
+            subscribers = {}
+            subscribers_user_ids = []
+            for u in response['items']:
+                user_id = u['id']
+                subscribers[user_id] = u
+                subscribers_user_ids.append(user_id)
+
+            print "______________________"
+            print response['count']
+            # print response
+            # return
 
             # getting likes
             response = api_call('likes.getList', type='post', owner_id=owner_id, item_id=item_id, v=5.44)
@@ -324,9 +327,12 @@ class DetailView(View, TemplateResponseMixin):
 
             user_ids = set()
             user_ids.update(subscribers_user_ids, likes_user_ids, shares_user_ids, comments_user_ids)
-            user_ids_str = ','.join([str(id) for id in user_ids])
+            l = list(user_ids)
+            l1 = l[:360]
 
-            response = api_call('users.get', user_ids=user_ids_str, fields='first_name, last_name, sex, bdate, country, city', v=5.44)
+            user_ids_str = ','.join([str(id) for id in l1])
+
+            response = api_call('users.get', user_ids=user_ids_str, fields='first_name, last_name, sex, bdate, country, city', v=5.8, count=360)
             print response
 
             for user in response:
