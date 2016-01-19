@@ -255,7 +255,7 @@ class DetailView(View, TemplateResponseMixin):
 
     # @staticmethod
     def get_vk_detail(self, link):
-        from vkontakte_api.api import api_call
+        from vkontakte_api.api import api_call, api_recursive_call
 
         # like https://vk.com/dev/likes.getList
         # share https://vk.com/dev/wall.getReposts
@@ -275,10 +275,10 @@ class DetailView(View, TemplateResponseMixin):
 
             # getting followers
             if int(owner_id) > 0:
-                response = api_call('users.getFollowers', user_id=owner_id, fields='last_name', v=5.44) # fields='last_name' added here to get 'deactivated' field
+                response = api_recursive_call('users.getFollowers', user_id=owner_id, fields='last_name', count=1000, v=5.44) # fields='last_name' added here to get 'deactivated' field
             else:
                 group_id = -1 * int(owner_id)
-                response = api_call('groups.getMembers', group_id=group_id, fields='last_name', v=5.44) # fields='last_name' added here to get 'deactivated' field
+                response = api_recursive_call('groups.getMembers', group_id=group_id, fields='last_name', count=1000, v=5.44) # fields='last_name' added here to get 'deactivated' field
 
             subscribers = {}
             subscribers_user_ids = []
@@ -293,11 +293,11 @@ class DetailView(View, TemplateResponseMixin):
             # return
 
             # getting likes
-            response = api_call('likes.getList', type='post', owner_id=owner_id, item_id=item_id, v=5.44)
+            response = api_recursive_call('likes.getList', type='post', owner_id=owner_id, item_id=item_id, count=1000, v=5.44)
             likes_user_ids = response['items']
 
             # getting shares
-            response = api_call('wall.getReposts', owner_id=owner_id, post_id=item_id, v=5.44)
+            response = api_recursive_call('wall.getReposts', owner_id=owner_id, post_id=item_id, count=1000, v=5.44)
             shares = response['items']
 
             shares_user_ids = []
@@ -307,7 +307,7 @@ class DetailView(View, TemplateResponseMixin):
 
             # getting comments
             # count max 100
-            response = api_call('wall.getComments', owner_id=owner_id, post_id=item_id, v=5.44)
+            response = api_recursive_call('wall.getComments', owner_id=owner_id, post_id=item_id, count=100, v=5.44)
             comments = response['items']
 
             comments_user_ids = []
@@ -320,38 +320,49 @@ class DetailView(View, TemplateResponseMixin):
             # print shares_user_ids
             # print comments_user_ids
 
+            print "counts:"
             print len(subscribers_user_ids)
             print len(likes_user_ids)
             print len(shares_user_ids)
             print len(comments_user_ids)
 
-            user_ids = set()
+            user_ids = set() # lets get unique set
             user_ids.update(subscribers_user_ids, likes_user_ids, shares_user_ids, comments_user_ids)
-            l = list(user_ids)
-            l1 = l[:360]
+            user_ids_list = list(user_ids)
 
-            user_ids_str = ','.join([str(id) for id in l1])
+            start_pos = 0
+            STEP = 350 # 350 is near maximum ids what method accepted, this number getting by experiment
+            end_pos += STEP
+            while start_pos < len(user_ids_list):
+                slice = user_ids_list[start_pos:end_pos]
+                print "slice:", len(slice)
+                user_ids_str = ','.join([str(id) for id in slice])
+                response = api_call('users.get', user_ids=user_ids_str, fields='first_name, last_name, sex, bdate, country, city', v=5.8)
+                # print response
 
-            response = api_call('users.get', user_ids=user_ids_str, fields='first_name, last_name, sex, bdate, country, city', v=5.8, count=360)
-            print response
+                for user in response:
+                    u = self.vk_user(user)
+                    user_id = user['id']
 
-            for user in response:
-                u = self.vk_user(user)
-                user_id = user['id']
+                    if user_id in subscribers_user_ids:
+                        u['member'] = 1
+                        if 'deactivated' in subscribers[user_id]:
+                            u['deactivated'] = subscribers[user_id]['deactivated']
+                    if user_id in likes_user_ids:
+                        u['like'] = 1
+                    if user_id in shares_user_ids:
+                        u['share'] = 1
+                    if user_id in comments_user_ids:
+                        u['comment'] = 1
 
-                if user_id in subscribers_user_ids:
-                    u['member'] = 1
-                    if 'deactivated' in subscribers[user_id]:
-                        u['deactivated'] = subscribers[user_id]['deactivated']
-                if user_id in likes_user_ids:
-                    u['like'] = 1
-                if user_id in shares_user_ids:
-                    u['share'] = 1
-                if user_id in comments_user_ids:
-                    u['comment'] = 1
+                    rows[user_id] = u
 
-                rows[user_id] = u
+                # increse
+                start_pos += STEP
+                end_pos += STEP
 
+            print "_________"
+            print len(rows)
             return rows
     
     
