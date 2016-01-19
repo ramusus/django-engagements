@@ -332,7 +332,7 @@ class DetailView(View, TemplateResponseMixin):
 
             start_pos = 0
             STEP = 350 # 350 is near maximum ids what method accepted, this number getting by experiment
-            end_pos += STEP
+            end_pos = STEP
             while start_pos < len(user_ids_list):
                 slice = user_ids_list[start_pos:end_pos]
                 print "slice:", len(slice)
