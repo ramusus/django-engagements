@@ -274,59 +274,78 @@ class DetailView(View, TemplateResponseMixin):
 
             # getting followers
             if owner_id > 0:
-                response = api_call('users.getFollowers', user_id=owner_id, v=5.44, fields='first_name, last_name, sex, bdate, country, city') # , count=1
-                followers = response['items']
-                # print followers
+                response = api_call('users.getFollowers', user_id=owner_id, fields='last_name', v=5.44) # fields='last_name' added here to get 'deactivated' field
+                subscribers = {}
+                subscribers_user_ids = []
+
+                for u in response['items']:
+                    user_id = u['id']
+                    subscribers[user_id] = u
+                    subscribers_user_ids.append(user_id)
+
+                print "______________________"
+                print response['count']
+
             else:
                 pass
-    
-            for user in followers:
-                u = self.vk_user(user)
-                u['member'] = 1
-                rows[user['id']] = u
 
             # getting likes
             response = api_call('likes.getList', type='post', owner_id=owner_id, item_id=item_id, v=5.44)
-            likes = response['items']
-
-            user_likes_to_get = []
-            for user_id in likes:
-                if user_id in rows:
-                    rows[user_id]['like'] = 1
-                else:
-                    user_likes_to_get.append(user_id)
+            likes_user_ids = response['items']
 
             # getting shares
             response = api_call('wall.getReposts', owner_id=owner_id, post_id=item_id, v=5.44)
             shares = response['items']
 
-            user_shares_to_get = []
+            shares_user_ids = []
             for share in shares:
                 user_id = share['from_id']
-                if user_id in rows:
-                    rows[user_id]['share'] = 1
-                else:
-                    user_shares_to_get.append(user_id)
+                shares_user_ids.append(user_id)
 
             # getting comments
+            # count max 100
             response = api_call('wall.getComments', owner_id=owner_id, post_id=item_id, v=5.44)
             comments = response['items']
 
-            user_comments_to_get = []
+            comments_user_ids = []
             for comment in comments:
                 user_id = comment['from_id']
-                if user_id in rows:
-                    rows[user_id]['comment'] = 1
-                else:
-                    user_comments_to_get.append(user_id)
+                shares_user_ids.append(user_id)
 
-            print user_likes_to_get
-            print user_shares_to_get
-            print user_comments_to_get
+            # print subscribers_user_ids
+            # print likes_user_ids
+            # print shares_user_ids
+            # print comments_user_ids
 
+            print len(subscribers_user_ids)
+            print len(likes_user_ids)
+            print len(shares_user_ids)
+            print len(comments_user_ids)
 
+            user_ids = set()
+            user_ids.update(subscribers_user_ids, likes_user_ids, shares_user_ids, comments_user_ids)
+            user_ids_str = ','.join([str(id) for id in user_ids])
 
-    
+            response = api_call('users.get', user_ids=user_ids_str, fields='first_name, last_name, sex, bdate, country, city', v=5.44)
+            print response
+
+            for user in response:
+                u = self.vk_user(user)
+                user_id = user['id']
+
+                if user_id in subscribers_user_ids:
+                    u['member'] = 1
+                    if 'deactivated' in subscribers[user_id]:
+                        u['deactivated'] = subscribers[user_id]['deactivated']
+                if user_id in likes_user_ids:
+                    u['like'] = 1
+                if user_id in shares_user_ids:
+                    u['share'] = 1
+                if user_id in comments_user_ids:
+                    u['comment'] = 1
+
+                rows[user_id] = u
+
             return rows
     
     
