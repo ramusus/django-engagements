@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 from django import forms
 
 
@@ -11,5 +10,14 @@ class EngagementsForm(forms.Form):
                                 'style': 'width: 100% !important;'
                             }))
 
-    SOCIALS = (('twitter', 'Twitter'),)
+    SOCIALS = (('twitter', 'Twitter'), ('vk', 'Vkontakte'),)
     socials = forms.ChoiceField(label=u'Соц. сеть', widget=forms.RadioSelect, choices=SOCIALS, required=True)
+
+
+
+class DetailForm(forms.Form):
+    link = forms.CharField(label=u'Ссылка', required=True,
+                            widget=forms.TextInput(attrs={
+                                'class': 'form-control',
+                                'style': 'width: 100% !important;'
+                            }))

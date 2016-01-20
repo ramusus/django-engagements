@@ -13,13 +13,13 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'django',
         'django-annoying',
         'django-picklefield',
         'django-oauth-tokens>=0.2.2',
         'python-dateutil>=1.5',
         'tweepy',
-        'django-twitter-api'
+        'django-twitter-api',
+        'django-vkontakte-api>=0.8.2',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

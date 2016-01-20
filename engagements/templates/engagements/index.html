@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<form action="{% url 'index' %}" method="post" class="form-horizontal">
+<form action="{% url 'engagements_form' %}" method="post" class="form-horizontal">
     {% csrf_token %}
     {% for field in form %}
     <div class="form-group {% if field.errors %}has-error{% endif %}">
@@ -11,7 +11,7 @@
                 {% for value, name in field.field.choices %}
                     <div class="radio">
                         <label>
-                            <input type="radio" name="{{ field.html_name }}" value="{{ value }}" checked>{{ name }}
+                            <input type="radio" name="{{ field.html_name }}" value="{{ value }}" {% if field.value == value %}checked{% endif %}>{{ name }}
                         </label>
                     </div>
                     <span class="help-inline">{{ field.errors.as_text }}</span>
@@ -29,21 +29,22 @@
         </div>
     </div>
 </form>
-{% if data %}
+{% if rows %}
     <a class="select-table" href="#">Выделить таблицу</a>
     <table class="table table-hover table-striped">
         <thead>
             <tr>
-                {% for heading in data.headings %}
+                {% for heading in headers %}
                     <th>{{ heading }}</th>
                 {% endfor %}
             </tr>
         </thead>
         <tbody>
-            {% for row in data.rows %}
+            {% for row in rows %}
                 {% if row.status == 'error' %}
                     <tr class="danger">
-                        <td colspan="{{ data.headings|length }}">{{ row.data.0|safe }}</td>
+                        <td>{{ row.data.0|safe }}</td>
+                        <td colspan="{{ headers|length }}">{{ row.data.1 }}</td>
                     </tr>
                 {% else %}
                     <tr>
