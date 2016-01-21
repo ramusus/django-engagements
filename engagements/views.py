@@ -4,6 +4,7 @@ import re
 from datetime import date
 from collections import OrderedDict
 
+from django.conf import settings
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
 
@@ -23,7 +24,7 @@ class IndexView(View, TemplateResponseMixin):
                 u'Избранное',
                 u'Ретвиты',
                 # u'Комментарии',
-            ]
+    ]
 
     vk_headers = [
             u'Ссылка',
@@ -31,7 +32,15 @@ class IndexView(View, TemplateResponseMixin):
             u'Лайки',
             u'Репосты',
             u'Комментарии',
-        ]
+    ]
+
+    fb_headers = [
+            u'Ссылка',
+            # u'Подписчики группы',
+            u'Лайки',
+            u'Репосты',
+            u'Комментарии',
+    ]
 
     def get(self, request):
         return self.render_to_response({"form": EngagementsForm})
@@ -146,6 +155,60 @@ class IndexView(View, TemplateResponseMixin):
                         'Incorrect url',
                     ]
                 })
+
+        return rows
+
+    @staticmethod
+    def get_fb(links):
+        from open_facebook import OpenFacebook
+        graph = OpenFacebook(settings.FACEBOOK_API_ACCESS_TOKEN)
+
+        rows = []
+
+        for link in links:
+            # https://www.facebook.com/Beelinerus/posts/588392457883231
+            matches = re.match(r'^https?://www.facebook.com/(.*?)/posts/(\d+)$', link)
+            link = '<a href="{0}">{0}</a>'.format(link)
+            if matches:
+                company_slug = matches.group(1)
+                post_id = matches.group(2)
+
+                company = graph.get(company_slug, fields='id')
+
+                post_graph_id = '%s_%s' % (company['id'], post_id)
+                post = graph.get(post_graph_id, fields='comments.limit(0).summary(true),likes.limit(0).summary(true),shares.limit(0).summary(true)')
+
+                likes = ''
+                shares = ''
+                comments = ''
+
+                if 'likes' in post:
+                    likes = post['likes']['summary']['total_count']
+                if 'shares' in post:
+                    shares = post['shares']['count']
+                if 'comments' in post:
+                    comments = post['comments']['summary']['total_count']
+
+                rows.append({
+                    'status': 'ok',
+                    'data': [
+                        link,
+                        # 0, # members
+                        likes,
+                        shares,
+                        comments,
+                    ]
+                })
+
+            else:
+                rows.append({
+                    'status': 'error',
+                    'data': [
+                        link,
+                        'Incorrect url',
+                    ]
+                })
+
 
         return rows
 
