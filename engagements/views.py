@@ -231,6 +231,15 @@ class DetailView(View, TemplateResponseMixin):
         ('comment', 'Комментарий'),
     ])
 
+    fb_detail_headers = OrderedDict([
+        ('name', 'Имя'),
+        ('url', 'Ссылка'),
+        ('like', 'Лайк'),
+        ('share', 'Поделился'),
+        ('comment', 'Комментарий'),
+    ])
+
+
 
     def get(self, request):
         return self.render_to_response({"form": DetailForm})
@@ -250,6 +259,7 @@ class DetailView(View, TemplateResponseMixin):
     def get_social(self, link):
         SOCIALS = {'twitter': 'https://twitter.com',
                    'vk': 'https://vk.com',
+                   'fb': 'https://www.facebook.com',
         }
         for social_name, social_url in SOCIALS.items():
             if link.startswith(social_url):
@@ -257,7 +267,6 @@ class DetailView(View, TemplateResponseMixin):
 
     def get_data(self, link):
         social_name = self.get_social(link)
-        print social_name
 
         return {
             'headers': getattr(self, '%s_detail_headers' % social_name),
@@ -313,7 +322,6 @@ class DetailView(View, TemplateResponseMixin):
 
         # print u
         return u
-
 
 
     # @staticmethod
@@ -427,6 +435,68 @@ class DetailView(View, TemplateResponseMixin):
             print "_________"
             print len(rows)
             return rows
-    
-    
-    
+
+    def fb_user(self, user):
+        u = OrderedDict()
+        for k in self.fb_detail_headers.keys():
+            u[k] = ''
+
+        u['name'] = user['name']
+        u['url'] = 'https://www.facebook.com/profile.php?id=%s' % user['id']
+        u['comment'] = 0
+
+        return u
+
+    def get_fb_detail(self, link):
+        from open_facebook import OpenFacebook
+        from . utils import recursive_graph_call
+
+        graph = OpenFacebook(settings.FACEBOOK_API_ACCESS_TOKEN)
+
+        rows = {}
+
+        matches = re.match(r'^https?://www.facebook.com/(.*?)/posts/(\d+)$', link)
+        if matches:
+            company_slug = matches.group(1)
+            post_id = matches.group(2)
+
+            company = graph.get(company_slug, fields='id')
+
+            post_graph_id = '%s_%s' % (company['id'], post_id)
+
+            # getting likes
+            response = recursive_graph_call(post_graph_id + '/likes', limit=500)
+
+            for user in response['data']:
+                u = self.fb_user(user)
+                u['like'] = 1
+                rows[user['id']] = u
+
+            # getting shares
+            response = recursive_graph_call(post_graph_id + '/sharedposts', fields='from', limit=500)
+
+            for share in response['data']:
+                user = share['from']
+
+                if user['id'] not in rows:
+                    u = self.fb_user(user)
+                    u['share'] = 1
+                    rows[user['id']] = u
+                else:
+                    rows[user['id']]['share'] = 1
+
+            # getting comments
+            response = recursive_graph_call(post_graph_id + '/comments', fields='from', limit=500)
+
+            for comment in response['data']:
+                user = comment['from']
+
+                if user['id'] not in rows:
+                    u = self.fb_user(user)
+                    u['comment'] += 1
+                    rows[user['id']] = u
+                else:
+                    rows[user['id']]['comment'] += 1
+
+
+            return rows
