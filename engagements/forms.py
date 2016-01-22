@@ -10,7 +10,7 @@ class EngagementsForm(forms.Form):
                                 'style': 'width: 100% !important;'
                             }))
 
-    SOCIALS = (('twitter', 'Twitter'), ('vk', 'Vkontakte'),)
+    SOCIALS = (('twitter', 'Twitter'), ('vk', 'Vkontakte'), ('fb', 'Facebook'),)
     socials = forms.ChoiceField(label=u'Соц. сеть', widget=forms.RadioSelect, choices=SOCIALS, required=True)
 
 
