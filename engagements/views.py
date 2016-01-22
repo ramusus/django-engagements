@@ -386,7 +386,7 @@ class DetailView(View, TemplateResponseMixin):
             comments_user_ids = []
             for comment in comments:
                 user_id = comment['from_id']
-                shares_user_ids.append(user_id)
+                comments_user_ids.append(user_id)
 
             # print subscribers_user_ids
             # print likes_user_ids
@@ -426,7 +426,7 @@ class DetailView(View, TemplateResponseMixin):
                     if user_id in shares_user_ids:
                         u['share'] = 1
                     if user_id in comments_user_ids:
-                        u['comment'] = 1
+                        u['comment'] = comments_user_ids.count(user_id)
 
                     rows[user_id] = u
 
