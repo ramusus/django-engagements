@@ -36,7 +36,8 @@ class IndexView(View, TemplateResponseMixin):
 
     fb_headers = [
             u'Ссылка',
-            # u'Подписчики группы',
+            u'Нравится страница',
+            u'Говорят о странице',
             u'Лайки',
             u'Репосты',
             u'Комментарии',
@@ -173,7 +174,7 @@ class IndexView(View, TemplateResponseMixin):
                 company_slug = matches.group(1)
                 post_id = matches.group(2)
 
-                company = graph.get(company_slug, fields='id')
+                company = graph.get(company_slug, fields='id,likes,talking_about_count')
 
                 post_graph_id = '%s_%s' % (company['id'], post_id)
                 post = graph.get(post_graph_id, fields='comments.limit(0).summary(true),likes.limit(0).summary(true),shares.limit(0).summary(true)')
@@ -193,7 +194,8 @@ class IndexView(View, TemplateResponseMixin):
                     'status': 'ok',
                     'data': [
                         link,
-                        # 0, # members
+                        company['likes'],
+                        company['talking_about_count'],
                         likes,
                         shares,
                         comments,
