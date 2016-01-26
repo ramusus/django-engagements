@@ -2,8 +2,6 @@ from django.conf import settings
 
 from open_facebook import OpenFacebook
 
-graph = OpenFacebook(settings.FACEBOOK_API_ACCESS_TOKEN)
-
 
 
 def recursive_graph_call(graph_id, *args, **kwargs):
@@ -11,6 +9,7 @@ def recursive_graph_call(graph_id, *args, **kwargs):
     '''
         response = recursive_graph_call('147863265269488_588392457883231/likes', limit=500)
     '''
+    graph = OpenFacebook(settings.FACEBOOK_API_ACCESS_TOKEN)
 
     if 'limit' not in kwargs:
         kwargs['limit'] = 100
