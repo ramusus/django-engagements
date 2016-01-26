@@ -241,6 +241,14 @@ class DetailView(View, TemplateResponseMixin):
         ('comment', 'Комментарий'),
     ])
 
+    twitter_detail_headers = OrderedDict([
+        ('name', 'Имя'),
+        ('url', 'Ссылка'),
+        ('location', 'Location'),
+        ('created_at', 'Аккаунт создан'),
+        ('follower', 'Follower'),
+        ('retweet', 'Retweet'),
+    ])
 
 
     def get(self, request):
@@ -502,3 +510,44 @@ class DetailView(View, TemplateResponseMixin):
 
 
             return rows
+
+    def twitter_user(self, user):
+        u = OrderedDict()
+        for k in self.twitter_detail_headers.keys():
+            u[k] = ''
+
+        u['name'] = user.name
+        u['url'] = 'https://twitter.com/%s' % user.screen_name
+        u['location'] = user.location
+        u['created_at'] = user.created_at.strftime("%d-%m-%Y %H:%M")
+
+        return u
+
+    def get_twitter_detail(self, link):
+        from twitter_api.api import api_call
+
+        rows = {}
+
+        matches = re.match(r'^https?://twitter.com/(.*?)/status/(\d+)$', link)
+        if matches:
+            screen_name = matches.group(1)
+            status_id = matches.group(2)
+
+        response = api_call('followers', screen_name)
+        for user in response:
+            u = self.twitter_user(user)
+            u['follower'] = 1
+            rows[user.id] = u
+
+        response = api_call('retweets', status_id)
+        for s in response:
+            user = s.user
+
+            if user.id not in rows:
+                u = self.twitter_user(user)
+                u['retweet'] = 1
+                rows[user.id] = u
+            else:
+                rows[user.id]['retweet'] = 1
+
+        return rows
