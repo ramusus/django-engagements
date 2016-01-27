@@ -262,7 +262,6 @@ class DetailView(View, TemplateResponseMixin):
         form = DetailForm(request.POST)
         if form.is_valid():
             link = form.cleaned_data['link']
-            print link
 
             context = self.get_data(link)
             context['form'] = form
@@ -291,7 +290,6 @@ class DetailView(View, TemplateResponseMixin):
 
     # @staticmethod
     def vk_user(self, user):
-        # print user
 
         u = OrderedDict()
         for k in self.vk_detail_headers.keys():
@@ -324,7 +322,6 @@ class DetailView(View, TemplateResponseMixin):
                 u["birth_date"] = birth_date.strftime("%d-%m-%Y")
                 u["age"] = self.age(birth_date)
 
-        # print u
         return u
 
 
@@ -340,13 +337,10 @@ class DetailView(View, TemplateResponseMixin):
         rows = OrderedDict()
 
         matches = re.match(r'^https?://vk\.com/wall(-?\d+_\d+)$', link)
-        # link = '<a href="{0}">{0}</a>'.format(link)
         if matches:
             post_id = matches.group(1)
             owner_id = post_id.split('_')[0]
             item_id = post_id.split('_')[1]
-            print post_id
-            print owner_id
 
             # getting followers
             if int(owner_id) > 0:
@@ -361,11 +355,6 @@ class DetailView(View, TemplateResponseMixin):
                 user_id = u['id']
                 subscribers[user_id] = u
                 subscribers_user_ids.append(user_id)
-
-            print "______________________"
-            print response['count']
-            # print response
-            # return
 
             # getting likes
             response = api_recursive_call('likes.getList', type='post', owner_id=owner_id, item_id=item_id, count=1000, v=5.44)
@@ -390,17 +379,6 @@ class DetailView(View, TemplateResponseMixin):
                 user_id = comment['from_id']
                 comments_user_ids.append(user_id)
 
-            # print subscribers_user_ids
-            # print likes_user_ids
-            # print shares_user_ids
-            # print comments_user_ids
-
-            print "counts:"
-            print len(subscribers_user_ids)
-            print len(likes_user_ids)
-            print len(shares_user_ids)
-            print len(comments_user_ids)
-
             user_ids = set() # lets get unique set
             user_ids.update(subscribers_user_ids, likes_user_ids, shares_user_ids, comments_user_ids)
             user_ids_list = list(user_ids)
@@ -410,10 +388,9 @@ class DetailView(View, TemplateResponseMixin):
             end_pos = STEP
             while start_pos < len(user_ids_list):
                 slice = user_ids_list[start_pos:end_pos]
-                print "slice:", len(slice)
+
                 user_ids_str = ','.join([str(id) for id in slice])
                 response = api_call('users.get', user_ids=user_ids_str, fields='first_name, last_name, sex, bdate, country, city', v=5.8)
-                # print response
 
                 for user in response:
                     u = self.vk_user(user)
@@ -435,10 +412,6 @@ class DetailView(View, TemplateResponseMixin):
                 # increse
                 start_pos += STEP
                 end_pos += STEP
-
-            print "_________"
-            print len(rows)
-
         else:
             rows['errors'] = 'Invalid post link'
 
