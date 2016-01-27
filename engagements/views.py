@@ -375,6 +375,12 @@ class DetailView(View, TemplateResponseMixin):
             owner_id = post_id.split('_')[0]
             item_id = post_id.split('_')[1]
 
+            # check
+            posts = api_call('wall.getById', posts=post_id, v=5.44)
+            if len(posts) == 0:
+                rows['errors'] = 'Post not found'
+                return rows
+
             # getting followers
             if int(owner_id) > 0:
                 response = api_recursive_call('users.getFollowers', user_id=owner_id, fields='last_name', count=1000, v=5.44) # fields='last_name' added here to get 'deactivated' field
