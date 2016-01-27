@@ -8,9 +8,8 @@ from django.conf import settings
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
 
-from twitter_api.api import api_call, TwitterError
 from vkontakte_api.api import api_call as vk_api_call
-from tweepy import Cursor
+from tweepy import Cursor, TweepError
 
 from . forms import EngagementsForm, DetailForm
 from . api import get_twitter_api
@@ -76,9 +75,12 @@ class IndexView(View, TemplateResponseMixin):
             link = '<a href="{0}">{0}</a>'.format(link)
             if matches:
                 status_id = matches.group(2)
+
+                api = get_twitter_api()
+
                 try:
-                    response = api_call('get_status', status_id)
-                except TwitterError:
+                    response = api.get_status(status_id)
+                except TweepError:
                     rows.append({
                         'status': 'error',
                         'data': [
