@@ -7,11 +7,13 @@ from collections import OrderedDict
 from django.conf import settings
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
+from open_facebook.exceptions import OpenFacebookException
 
-from twitter_api.api import api_call, TwitterError
 from vkontakte_api.api import api_call as vk_api_call
+from tweepy import Cursor, TweepError
 
-from .forms import EngagementsForm, DetailForm
+from . forms import EngagementsForm, DetailForm, get_social
+from . api import get_twitter_api
 
 
 class IndexView(View, TemplateResponseMixin):
@@ -73,14 +75,29 @@ class IndexView(View, TemplateResponseMixin):
             matches = re.match(r'^https?://twitter\.com/(.*?)/status/(\d+)$', link)
             link = '<a href="{0}">{0}</a>'.format(link)
             if matches:
+                screen_name = matches.group(1)
                 status_id = matches.group(2)
+
+                api = get_twitter_api()
+
                 try:
-                    response = api_call('get_status', status_id)
-                except TwitterError:
+                    response = api.get_status(status_id)
+                except TweepError as e:
                     rows.append({
                         'status': 'error',
                         'data': [
                             link,
+                            e
+                        ]
+                    })
+                    continue
+
+                if not screen_name == response.user.screen_name:
+                    rows.append({
+                        'status': 'error',
+                        'data': [
+                            link,
+                            'This tweet not belong this user',
                         ]
                     })
                     continue
@@ -174,10 +191,30 @@ class IndexView(View, TemplateResponseMixin):
                 company_slug = matches.group(1)
                 post_id = matches.group(2)
 
-                company = graph.get(company_slug, fields='id,likes,talking_about_count')
+                try:
+                    company = graph.get(company_slug, fields='id,likes,talking_about_count')
+                except OpenFacebookException as e:
+                    rows.append({
+                        'status': 'error',
+                        'data': [
+                            link,
+                            'Company not found',
+                        ]
+                    })
+                    continue
 
                 post_graph_id = '%s_%s' % (company['id'], post_id)
-                post = graph.get(post_graph_id, fields='comments.limit(0).summary(true),likes.limit(0).summary(true),shares.limit(0).summary(true)')
+                try:
+                    post = graph.get(post_graph_id, fields='comments.limit(0).summary(true),likes.limit(0).summary(true),shares.limit(0).summary(true)')
+                except OpenFacebookException as e:
+                    rows.append({
+                        'status': 'error',
+                        'data': [
+                            link,
+                            'Post not found',
+                        ]
+                    })
+                    continue
 
                 likes = ''
                 shares = ''
@@ -258,7 +295,6 @@ class DetailView(View, TemplateResponseMixin):
         form = DetailForm(request.POST)
         if form.is_valid():
             link = form.cleaned_data['link']
-            print link
 
             context = self.get_data(link)
             context['form'] = form
@@ -266,23 +302,13 @@ class DetailView(View, TemplateResponseMixin):
 
         return self.render_to_response({"form": form})
 
-    def get_social(self, link):
-        SOCIALS = {'twitter': 'https://twitter.com',
-                   'vk': 'https://vk.com',
-                   'fb': 'https://www.facebook.com',
-        }
-        for social_name, social_url in SOCIALS.items():
-            if link.startswith(social_url):
-                return social_name
-
     def get_data(self, link):
-        social_name = self.get_social(link)
+        social_name = get_social(link)
 
         return {
             'headers': getattr(self, '%s_detail_headers' % social_name),
             'rows': getattr(self, 'get_%s_detail' % social_name)(link)
          }
-
 
     def age(self, birth_date):
         if birth_date:
@@ -297,7 +323,6 @@ class DetailView(View, TemplateResponseMixin):
 
     # @staticmethod
     def vk_user(self, user):
-        # print user
 
         u = OrderedDict()
         for k in self.vk_detail_headers.keys():
@@ -330,7 +355,6 @@ class DetailView(View, TemplateResponseMixin):
                 u["birth_date"] = birth_date.strftime("%d-%m-%Y")
                 u["age"] = self.age(birth_date)
 
-        # print u
         return u
 
 
@@ -346,13 +370,16 @@ class DetailView(View, TemplateResponseMixin):
         rows = OrderedDict()
 
         matches = re.match(r'^https?://vk\.com/wall(-?\d+_\d+)$', link)
-        # link = '<a href="{0}">{0}</a>'.format(link)
         if matches:
             post_id = matches.group(1)
             owner_id = post_id.split('_')[0]
             item_id = post_id.split('_')[1]
-            print post_id
-            print owner_id
+
+            # check
+            posts = api_call('wall.getById', posts=post_id, v=5.44)
+            if len(posts) == 0:
+                rows['errors'] = 'Post not found'
+                return rows
 
             # getting followers
             if int(owner_id) > 0:
@@ -367,11 +394,6 @@ class DetailView(View, TemplateResponseMixin):
                 user_id = u['id']
                 subscribers[user_id] = u
                 subscribers_user_ids.append(user_id)
-
-            print "______________________"
-            print response['count']
-            # print response
-            # return
 
             # getting likes
             response = api_recursive_call('likes.getList', type='post', owner_id=owner_id, item_id=item_id, count=1000, v=5.44)
@@ -396,17 +418,6 @@ class DetailView(View, TemplateResponseMixin):
                 user_id = comment['from_id']
                 comments_user_ids.append(user_id)
 
-            # print subscribers_user_ids
-            # print likes_user_ids
-            # print shares_user_ids
-            # print comments_user_ids
-
-            print "counts:"
-            print len(subscribers_user_ids)
-            print len(likes_user_ids)
-            print len(shares_user_ids)
-            print len(comments_user_ids)
-
             user_ids = set() # lets get unique set
             user_ids.update(subscribers_user_ids, likes_user_ids, shares_user_ids, comments_user_ids)
             user_ids_list = list(user_ids)
@@ -416,10 +427,9 @@ class DetailView(View, TemplateResponseMixin):
             end_pos = STEP
             while start_pos < len(user_ids_list):
                 slice = user_ids_list[start_pos:end_pos]
-                print "slice:", len(slice)
+
                 user_ids_str = ','.join([str(id) for id in slice])
                 response = api_call('users.get', user_ids=user_ids_str, fields='first_name, last_name, sex, bdate, country, city', v=5.8)
-                # print response
 
                 for user in response:
                     u = self.vk_user(user)
@@ -441,10 +451,10 @@ class DetailView(View, TemplateResponseMixin):
                 # increse
                 start_pos += STEP
                 end_pos += STEP
+        else:
+            rows['errors'] = 'Invalid post link'
 
-            print "_________"
-            print len(rows)
-            return rows
+        return rows
 
     def fb_user(self, user):
         u = OrderedDict()
@@ -470,9 +480,19 @@ class DetailView(View, TemplateResponseMixin):
             company_slug = matches.group(1)
             post_id = matches.group(2)
 
-            company = graph.get(company_slug, fields='id')
+            try:
+                company = graph.get(company_slug, fields='id')
+            except OpenFacebookException as e:
+                rows['errors'] = 'Company not found'
+                return rows
 
+            # check
             post_graph_id = '%s_%s' % (company['id'], post_id)
+            try:
+                post = graph.get(post_graph_id, fields='id')
+            except OpenFacebookException as e:
+                rows['errors'] = 'Post not found'
+                return rows
 
             # getting likes
             response = recursive_graph_call(post_graph_id + '/likes', limit=500)
@@ -507,9 +527,10 @@ class DetailView(View, TemplateResponseMixin):
                     rows[user['id']] = u
                 else:
                     rows[user['id']]['comment'] += 1
+        else:
+            rows['errors'] = 'Invalid post link'
 
-
-            return rows
+        return rows
 
     def twitter_user(self, user):
         u = OrderedDict()
@@ -524,8 +545,6 @@ class DetailView(View, TemplateResponseMixin):
         return u
 
     def get_twitter_detail(self, link):
-        from twitter_api.api import api_call
-
         rows = {}
 
         matches = re.match(r'^https?://twitter.com/(.*?)/status/(\d+)$', link)
@@ -533,21 +552,35 @@ class DetailView(View, TemplateResponseMixin):
             screen_name = matches.group(1)
             status_id = matches.group(2)
 
-        response = api_call('followers', screen_name)
-        for user in response:
-            u = self.twitter_user(user)
-            u['follower'] = 1
-            rows[user.id] = u
+            api = get_twitter_api()
 
-        response = api_call('retweets', status_id)
-        for s in response:
-            user = s.user
+            try:
+                response = api.get_status(status_id)
+            except TweepError as e:
+                rows['errors'] = e
+                return rows
 
-            if user.id not in rows:
+            if not screen_name == response.user.screen_name:
+                rows['errors'] = 'This tweet not belong this user'
+                return rows
+
+            response = Cursor(api.followers, screen_name=screen_name, count=200).items()
+            for user in response:
                 u = self.twitter_user(user)
-                u['retweet'] = 1
+                u['follower'] = 1
                 rows[user.id] = u
-            else:
-                rows[user.id]['retweet'] = 1
+
+            response = api.retweets(status_id)
+            for s in response:
+                user = s.user
+
+                if user.id not in rows:
+                    u = self.twitter_user(user)
+                    u['retweet'] = 1
+                    rows[user.id] = u
+                else:
+                    rows[user.id]['retweet'] = 1
+        else:
+            rows['errors'] = 'Invalid post link'
 
         return rows
