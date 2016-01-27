@@ -10,8 +10,10 @@ from django.views.generic.base import TemplateResponseMixin
 
 from twitter_api.api import api_call, TwitterError
 from vkontakte_api.api import api_call as vk_api_call
+from tweepy import Cursor
 
-from .forms import EngagementsForm, DetailForm
+from . forms import EngagementsForm, DetailForm
+from . api import get_twitter_api
 
 
 class IndexView(View, TemplateResponseMixin):
@@ -524,8 +526,6 @@ class DetailView(View, TemplateResponseMixin):
         return u
 
     def get_twitter_detail(self, link):
-        from twitter_api.api import api_call
-
         rows = {}
 
         matches = re.match(r'^https?://twitter.com/(.*?)/status/(\d+)$', link)
@@ -533,21 +533,23 @@ class DetailView(View, TemplateResponseMixin):
             screen_name = matches.group(1)
             status_id = matches.group(2)
 
-        response = api_call('followers', screen_name)
-        for user in response:
-            u = self.twitter_user(user)
-            u['follower'] = 1
-            rows[user.id] = u
+            api = get_twitter_api()
 
-        response = api_call('retweets', status_id)
-        for s in response:
-            user = s.user
-
-            if user.id not in rows:
+            response = Cursor(api.followers, screen_name=screen_name, count=200).items()
+            for user in response:
                 u = self.twitter_user(user)
-                u['retweet'] = 1
+                u['follower'] = 1
                 rows[user.id] = u
-            else:
-                rows[user.id]['retweet'] = 1
+
+            response = api.retweets(status_id)
+            for s in response:
+                user = s.user
+
+                if user.id not in rows:
+                    u = self.twitter_user(user)
+                    u['retweet'] = 1
+                    rows[user.id] = u
+                else:
+                    rows[user.id]['retweet'] = 1
 
         return rows
