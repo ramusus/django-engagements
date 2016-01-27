@@ -74,17 +74,29 @@ class IndexView(View, TemplateResponseMixin):
             matches = re.match(r'^https?://twitter\.com/(.*?)/status/(\d+)$', link)
             link = '<a href="{0}">{0}</a>'.format(link)
             if matches:
+                screen_name = matches.group(1)
                 status_id = matches.group(2)
 
                 api = get_twitter_api()
 
                 try:
                     response = api.get_status(status_id)
-                except TweepError:
+                except TweepError as e:
                     rows.append({
                         'status': 'error',
                         'data': [
                             link,
+                            e
+                        ]
+                    })
+                    continue
+
+                if not screen_name == response.user.screen_name:
+                    rows.append({
+                        'status': 'error',
+                        'data': [
+                            link,
+                            'This tweet not belong this user',
                         ]
                     })
                     continue
@@ -504,6 +516,16 @@ class DetailView(View, TemplateResponseMixin):
             status_id = matches.group(2)
 
             api = get_twitter_api()
+
+            try:
+                response = api.get_status(status_id)
+            except TweepError as e:
+                rows['errors'] = e
+                return rows
+
+            if not screen_name == response.user.screen_name:
+                rows['errors'] = 'This tweet not belong this user'
+                return rows
 
             response = Cursor(api.followers, screen_name=screen_name, count=200).items()
             for user in response:
