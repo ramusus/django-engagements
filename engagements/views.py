@@ -480,9 +480,19 @@ class DetailView(View, TemplateResponseMixin):
             company_slug = matches.group(1)
             post_id = matches.group(2)
 
-            company = graph.get(company_slug, fields='id')
+            try:
+                company = graph.get(company_slug, fields='id')
+            except OpenFacebookException as e:
+                rows['errors'] = 'Company not found'
+                return rows
 
+            # check
             post_graph_id = '%s_%s' % (company['id'], post_id)
+            try:
+                post = graph.get(post_graph_id, fields='id')
+            except OpenFacebookException as e:
+                rows['errors'] = 'Post not found'
+                return rows
 
             # getting likes
             response = recursive_graph_call(post_graph_id + '/likes', limit=500)
