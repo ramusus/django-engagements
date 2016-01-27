@@ -438,7 +438,11 @@ class DetailView(View, TemplateResponseMixin):
 
             print "_________"
             print len(rows)
-            return rows
+
+        else:
+            rows['errors'] = 'Invalid post link'
+
+        return rows
 
     def fb_user(self, user):
         u = OrderedDict()
@@ -501,9 +505,10 @@ class DetailView(View, TemplateResponseMixin):
                     rows[user['id']] = u
                 else:
                     rows[user['id']]['comment'] += 1
+        else:
+            rows['errors'] = 'Invalid post link'
 
-
-            return rows
+        return rows
 
     def twitter_user(self, user):
         u = OrderedDict()
@@ -543,5 +548,7 @@ class DetailView(View, TemplateResponseMixin):
                     rows[user.id] = u
                 else:
                     rows[user.id]['retweet'] = 1
+        else:
+            rows['errors'] = 'Invalid post link'
 
         return rows
