@@ -11,7 +11,7 @@ from django.views.generic.base import TemplateResponseMixin
 from vkontakte_api.api import api_call as vk_api_call
 from tweepy import Cursor, TweepError
 
-from . forms import EngagementsForm, DetailForm
+from . forms import EngagementsForm, DetailForm, get_social
 from . api import get_twitter_api
 
 
@@ -270,23 +270,13 @@ class DetailView(View, TemplateResponseMixin):
 
         return self.render_to_response({"form": form})
 
-    def get_social(self, link):
-        SOCIALS = {'twitter': 'https://twitter.com',
-                   'vk': 'https://vk.com',
-                   'fb': 'https://www.facebook.com',
-        }
-        for social_name, social_url in SOCIALS.items():
-            if link.startswith(social_url):
-                return social_name
-
     def get_data(self, link):
-        social_name = self.get_social(link)
+        social_name = get_social(link)
 
         return {
             'headers': getattr(self, '%s_detail_headers' % social_name),
             'rows': getattr(self, 'get_%s_detail' % social_name)(link)
          }
-
 
     def age(self, birth_date):
         if birth_date:
