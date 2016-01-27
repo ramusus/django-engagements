@@ -7,6 +7,7 @@ from collections import OrderedDict
 from django.conf import settings
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
+from open_facebook.exceptions import OpenFacebookException
 
 from vkontakte_api.api import api_call as vk_api_call
 from tweepy import Cursor, TweepError
@@ -190,10 +191,30 @@ class IndexView(View, TemplateResponseMixin):
                 company_slug = matches.group(1)
                 post_id = matches.group(2)
 
-                company = graph.get(company_slug, fields='id,likes,talking_about_count')
+                try:
+                    company = graph.get(company_slug, fields='id,likes,talking_about_count')
+                except OpenFacebookException as e:
+                    rows.append({
+                        'status': 'error',
+                        'data': [
+                            link,
+                            'Company not found',
+                        ]
+                    })
+                    continue
 
                 post_graph_id = '%s_%s' % (company['id'], post_id)
-                post = graph.get(post_graph_id, fields='comments.limit(0).summary(true),likes.limit(0).summary(true),shares.limit(0).summary(true)')
+                try:
+                    post = graph.get(post_graph_id, fields='comments.limit(0).summary(true),likes.limit(0).summary(true),shares.limit(0).summary(true)')
+                except OpenFacebookException as e:
+                    rows.append({
+                        'status': 'error',
+                        'data': [
+                            link,
+                            'Post not found',
+                        ]
+                    })
+                    continue
 
                 likes = ''
                 shares = ''
