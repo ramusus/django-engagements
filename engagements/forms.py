@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 from django import forms
-from django.core.exceptions import ValidationError
+# from django.core.exceptions import ValidationError
 
 
-def get_social(link):
-    SOCIALS = {'twitter': 'https://twitter.com',
-               'vk': 'https://vk.com',
-               'fb': 'https://www.facebook.com',
-    }
-    for social_name, social_url in SOCIALS.items():
-        if link.startswith(social_url):
-            return social_name
-
-
-def social_validator(value):
-    social = get_social(value)
-
-    if not social:
-        raise ValidationError('%s This social net is not supported' % value)
-
+# def get_social(link):
+#     SOCIALS = {'twitter': 'https://twitter.com',
+#                'vk': 'https://vk.com',
+#                'fb': 'https://www.facebook.com',
+#     }
+#     for social_name, social_url in SOCIALS.items():
+#         if link.startswith(social_url):
+#             return social_name
+#
+#
+# def social_validator(value):
+#     social = get_social(value)
+#
+#     if not social:
+#         raise ValidationError('%s This social net is not supported' % value)
 
 
 class EngagementsForm(forms.Form):
@@ -33,12 +32,5 @@ class EngagementsForm(forms.Form):
     socials = forms.ChoiceField(label=u'Соц. сеть', widget=forms.RadioSelect, choices=SOCIALS, required=True)
 
 
-
-class DetailForm(forms.Form):
-    link = forms.URLField(label=u'Ссылка', required=True,
-                            widget=forms.TextInput(attrs={
-                                'class': 'form-control',
-                                'style': 'width: 100% !important;'
-                            }),
-                            validators=[social_validator]
-                          )
+class DetailForm(EngagementsForm):
+    pass
